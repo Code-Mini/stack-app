@@ -1,0 +1,128 @@
+name: CI - Pull Request
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run build
+      run: npm run build
+      
+    - name: Run tests
+      run: npm test
+      
+    - name: Start application (health check)
+      run: |
+        # Create a minimal config for testing
+        mkdir -p data
+        echo "database:
+          type: sqlite
+          path: ./data/test.db
+        api:
+          port: 3001
+          keys: 
+            - test-key
+        docker:
+          socketPath: /var/run/docker.sock
+        logging:
+          level: error" > test-config.yaml
+        
+        # Start app in background using CLI
+        timeout 30s ./bin/stack-app --config test-config.yaml &
+        APP_PID=$!
+        
+        # Wait for startup
+        sleep 5
+        
+        # Test health endpoint
+        curl -f http://localhost:3001/health || (echo "Health check failed" && kill $APP_PID && exit 1)
+        
+        # Clean up
+        kill $APP_PID || true
+        rm -f test-config.yaml
+      env:
+        NODE_ENV: test
+
+  docker-build-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: false
+        tags: stack-app:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Test Docker image
+      run: |
+        # Test Docker image without mounting Docker socket (to avoid permission issues in CI)
+        docker run -d --name stack-app-test -p 3001:3001 \
+          -e NODE_ENV=test \
+          stack-app:test
+        
+        # Wait for startup
+        sleep 15
+        
+        # Test health endpoint (Docker status may show as unavailable, which is expected in CI)
+        if curl -f http://localhost:3001/health; then
+          echo "✅ Health check passed"
+        else
+          echo "❌ Health check failed"
+          docker logs stack-app-test
+          exit 1
+        fi
+        
+        # Clean up
+        docker stop stack-app-test || true
+        docker rm stack-app-test || true
+
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'

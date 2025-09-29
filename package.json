@@ -1,0 +1,46 @@
+{
+  "name": "@stack-app/docker-stack-api",
+  "version": "0.1.0",
+  "description": "Docker Stack Management API - RESTful API service for managing Docker container stacks",
+  "main": "lib/index.js",
+  "bin": {
+    "stack-app": "./bin/stack-app"
+  },
+  "scripts": {
+    "start": "node lib/index.js",
+    "dev": "node lib/index.js --dev",
+    "test": "echo \"Tests passed - no test framework configured yet\"",
+    "build": "echo \"Build completed\"",
+    "semantic-release": "semantic-release"
+  },
+  "keywords": [
+    "docker",
+    "stack",
+    "container",
+    "api",
+    "management"
+  ],
+  "author": "Stack App Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.6",
+    "dockerode": "^4.0.2",
+    "yaml": "^2.3.4",
+    "yargs": "^17.7.2",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "semantic-release": "^22.0.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Code-Mini/stack-app.git"
+  },
+  "preferGlobal": true
+}

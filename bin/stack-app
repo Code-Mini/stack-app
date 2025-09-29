@@ -1,0 +1,59 @@
+#!/usr/bin/env node
+
+const yargs = require('yargs');
+const path = require('path');
+const fs = require('fs');
+
+// Import main application
+const StackApp = require('../lib/index');
+
+const argv = yargs
+  .option('config', {
+    alias: 'c',
+    type: 'string',
+    description: 'Path to configuration file',
+    default: process.env.STACK_APP_CONFIG
+  })
+  .option('port', {
+    alias: 'p',
+    type: 'number',
+    description: 'Port to listen on',
+    default: 3001
+  })
+  .option('dev', {
+    type: 'boolean',
+    description: 'Run in development mode',
+    default: false
+  })
+  .help()
+  .alias('help', 'h')
+  .version('1.0.0')
+  .argv;
+
+// Configuration file resolution (as per requirements)
+let configPath = argv.config;
+if (!configPath) {
+  const defaultPaths = [
+    '/etc/stack-app/config.yaml',
+    '/etc/stack-app/config.json'
+  ];
+  
+  for (const path of defaultPaths) {
+    if (fs.existsSync(path)) {
+      configPath = path;
+      break;
+    }
+  }
+}
+
+// Start the application
+const app = new StackApp({
+  configPath,
+  port: argv.port,
+  isDev: argv.dev
+});
+
+app.start().catch(error => {
+  console.error('Failed to start Stack App:', error);
+  process.exit(1);
+});

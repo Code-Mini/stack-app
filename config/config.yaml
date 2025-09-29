@@ -1,0 +1,17 @@
+# Example configuration for Stack App
+database:
+  type: sqlite
+  path: ./data/stacks.db
+
+api:
+  port: 3001
+  keys:
+    - "1062e8cfd6e93f435eff03879299e08cbe0010ed3e24f6a66e2a4623cffa7261"
+    - "a72caf2b0c18509948d7c55b5d0de1e9462c021fa5f4a008183ff8bf819549eb"
+
+docker:
+  socketPath: /var/run/docker.sock
+
+logging:
+  level: info
+  format: json
