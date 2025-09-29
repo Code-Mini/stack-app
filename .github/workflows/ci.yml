@@ -34,11 +34,33 @@ jobs:
       
     - name: Start application (health check)
       run: |
-        timeout 30s npm start &
+        # Create a minimal config for testing
+        mkdir -p data
+        echo "database:
+          type: sqlite
+          path: ./data/test.db
+        api:
+          port: 3001
+          keys: 
+            - test-key
+        docker:
+          socketPath: /var/run/docker.sock
+        logging:
+          level: error" > test-config.yaml
+        
+        # Start app in background using CLI
+        timeout 30s ./bin/stack-app --config test-config.yaml &
         APP_PID=$!
+        
+        # Wait for startup
         sleep 5
+        
+        # Test health endpoint
         curl -f http://localhost:3001/health || (echo "Health check failed" && kill $APP_PID && exit 1)
-        kill $APP_PID
+        
+        # Clean up
+        kill $APP_PID || true
+        rm -f test-config.yaml
       env:
         NODE_ENV: test
 
@@ -63,20 +85,26 @@ jobs:
         
     - name: Test Docker image
       run: |
-        # Start container in background
+        # Test Docker image without mounting Docker socket (to avoid permission issues in CI)
         docker run -d --name stack-app-test -p 3001:3001 \
-          -v /var/run/docker.sock:/var/run/docker.sock:ro \
+          -e NODE_ENV=test \
           stack-app:test
         
         # Wait for startup
-        sleep 10
+        sleep 15
         
-        # Test health endpoint
-        curl -f http://localhost:3001/health
+        # Test health endpoint (Docker status may show as unavailable, which is expected in CI)
+        if curl -f http://localhost:3001/health; then
+          echo "✅ Health check passed"
+        else
+          echo "❌ Health check failed"
+          docker logs stack-app-test
+          exit 1
+        fi
         
         # Clean up
-        docker stop stack-app-test
-        docker rm stack-app-test
+        docker stop stack-app-test || true
+        docker rm stack-app-test || true
 
   security-scan:
     runs-on: ubuntu-latest
