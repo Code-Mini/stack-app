@@ -1,6 +1,6 @@
 {
   "name": "@stack-app/docker-stack-api",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Docker Stack Management API - RESTful API service for managing Docker container stacks",
   "main": "lib/index.js",
   "bin": {
@@ -9,7 +9,9 @@
   "scripts": {
     "start": "node lib/index.js",
     "dev": "node lib/index.js --dev",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "echo \"Build completed\"",
+    "semantic-release": "semantic-release"
   },
   "keywords": [
     "docker",
@@ -27,6 +29,11 @@
     "yaml": "^2.3.4",
     "yargs": "^17.7.2",
     "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "semantic-release": "^22.0.5"
   },
   "engines": {
     "node": ">=18.0.0"

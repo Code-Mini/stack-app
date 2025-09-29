@@ -1,0 +1,103 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        registry-url: 'https://registry.npmjs.org'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run build
+      run: npm run build
+      
+    - name: Run tests
+      run: npm test
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+        
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Get release version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" == "release" ]; then
+          echo "version=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+        else
+          echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: |
+          stackapp/docker-stack-api
+          ghcr.io/${{ github.repository }}
+        tags: |
+          type=semver,pattern={{version}},value=${{ steps.version.outputs.version }}
+          type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.version }}
+          type=semver,pattern={{major}},value=${{ steps.version.outputs.version }}
+          
+    - name: Build and push release Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        platforms: linux/amd64,linux/arm64
+        
+    - name: Publish to NPM
+      run: npm publish --access public
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        
+    - name: Create GitHub Release Assets
+      run: |
+        mkdir -p dist
+        tar -czf dist/stack-app-${{ steps.version.outputs.version }}.tar.gz \
+          --exclude=node_modules \
+          --exclude=.git \
+          --exclude=dist \
+          .
+        
+    - name: Upload Release Assets
+      uses: softprops/action-gh-release@v1
+      if: github.event_name == 'release'
+      with:
+        files: dist/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

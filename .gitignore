@@ -127,3 +127,11 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+# CI/CD artifacts
+dist/
+build/
+coverage/
+
+# Semantic release
+CHANGELOG.md

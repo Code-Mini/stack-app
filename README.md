@@ -264,7 +264,32 @@ npm run dev
 
 # Start server
 npm start
+
+# Run semantic release (for maintainers)
+npm run semantic-release
 ```
+
+## CI/CD
+
+This project uses GitHub Actions for continuous integration and deployment:
+
+### Workflows
+- **CI**: Runs on pull requests - tests, builds, and Docker image validation
+- **CD**: Runs on main branch - builds, tests, pushes Docker images, and handles releases
+- **Release**: Handles versioned releases with Docker images and NPM publishing
+- **Security**: Weekly security scans and dependency audits
+
+### Container Registries
+- **Docker Hub**: `stackapp/docker-stack-api`
+- **GitHub Container Registry**: `ghcr.io/code-mini/stack-app`
+
+### Semantic Versioning
+This project uses semantic-release for automated versioning:
+- `fix:` commits trigger patch releases (0.1.0 → 0.1.1)
+- `feat:` commits trigger minor releases (0.1.0 → 0.2.0)  
+- `BREAKING CHANGE:` triggers major releases (0.1.0 → 1.0.0)
+
+See [.github/WORKFLOWS.md](.github/WORKFLOWS.md) for detailed workflow documentation.
 
 ## License
 
