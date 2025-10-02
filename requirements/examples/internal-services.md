@@ -266,7 +266,22 @@ Access: `http://192.168.1.100/gitlab`
 
 ## SSL Options for Internal Networks
 
-### Option 0: Let's Encrypt with DNS-01 Challenge (Best for Internal Domains)
+**Quick Decision Guide:**
+
+| Option | Best For | Pros | Cons |
+|--------|----------|------|------|
+| **⭐ DNS-01 Challenge** | **Most internal deployments** | Real certs, auto-renewal, no warnings | Needs public domain + DNS API |
+| HTTP Only | Testing, legacy apps | Simple, no setup | Unencrypted, browser warnings |
+| Self-Signed | Air-gapped networks | Works offline | Manual distribution, renewal |
+| Private CA | Enterprise PKI | Centralized control | Infrastructure overhead |
+
+**For 90% of use cases: Use DNS-01 Challenge** - Get real Let's Encrypt certificates for internal domains!
+
+---
+
+### ⭐ Recommended: Let's Encrypt with DNS-01 Challenge
+
+**This is the BEST approach for internal domains - real SSL certificates without public internet access!**
 
 **Yes! You CAN get real Let's Encrypt certificates for internal domains!**
 
@@ -412,11 +427,22 @@ https://gitlab.internal.company.com  ✅ Valid SSL certificate!
 
 **Security Note:** Even though the DNS record is public, the IP (192.168.1.100) is private/internal and not routable from the internet. No security risk.
 
+**Why This is Recommended:**
+- ✅ **Zero browser warnings** - Real, trusted certificates
+- ✅ **Automatic renewal** - Set it and forget it
+- ✅ **Works for internal-only services** - No public internet exposure needed
+- ✅ **Professional setup** - Same quality as production services
+- ✅ **Wildcard support** - One cert for all subdomains (`*.internal.company.com`)
+- ✅ **Future-proof** - Works with HTTPS-only modern applications
+
 ---
 
-### Option 1: No SSL (HTTP Only)
+### Alternative Option 1: No SSL (HTTP Only)
 
-**Simplest approach for truly internal networks:**
+**Use only when:**
+- Completely isolated network with no DNS provider access
+- Testing/development environment
+- Legacy applications that don't work with HTTPS
 
 ```json
 {
@@ -448,9 +474,12 @@ https://gitlab.internal.company.com  ✅ Valid SSL certificate!
 
 ---
 
-### Option 2: Self-Signed Certificates
+### Alternative Option 2: Self-Signed Certificates
 
-For internal services that require HTTPS:
+**Use only when:**
+- No public domain available
+- Completely air-gapped network (no internet at all)
+- Cannot use DNS providers (regulatory/policy restrictions)
 
 **1. Generate self-signed certificate:**
 ```bash
@@ -524,9 +553,13 @@ Import-Certificate -FilePath ca.crt -CertStoreLocation Cert:\LocalMachine\Root
 
 ---
 
-### Option 3: Private Certificate Authority (Enterprise)
+### Alternative Option 3: Private Certificate Authority (Enterprise)
 
-For larger organizations, use a private CA:
+**Use when:**
+- Large organization with dedicated security team
+- Need centralized certificate lifecycle management
+- High security/compliance requirements
+- Already have PKI infrastructure
 
 **Tools:**
 - **HashiCorp Vault** - PKI secrets engine
