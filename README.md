@@ -11,29 +11,31 @@ Stack App transforms your Docker host into a production-ready platform with auto
 
 ## What It Does
 
-Stack App is infrastructure-as-code for Docker, packaged as a single container. It eliminates the complexity of manually configuring reverse proxies, SSL certificates, and container orchestration.
+Stack App is **CloudFront + API Gateway + Lambda for your own infrastructure**, packaged as a single container.
+
+Think of it as your local AWS edge infrastructure - route domains to multiple origins (containers, external APIs, S3, Lambda functions) with automatic SSL, all managed via REST API.
 
 **The Problem It Solves:**
-Setting up production Docker infrastructure typically requires manually configuring Traefik/Nginx, managing SSL certificates, writing docker-compose files, and maintaining routing rules. Each new service means updating multiple configuration files and restarting proxies.
+Setting up production Docker infrastructure typically requires manually configuring Traefik/Nginx, managing SSL certificates, writing docker-compose files, and maintaining routing rules. AWS makes this easy with CloudFront + API Gateway + Lambda, but you're locked into AWS.
 
 **The Stack App Solution:**
-Deploy Stack App once. It automatically provisions and manages:
+Get AWS-like routing and orchestration on your own infrastructure:
 
-- **Traefik Reverse Proxy** - Auto-deployed, configured, and maintained
-- **SSL/TLS Certificates** - Let's Encrypt automation with multi-provider support
-- **Container Stacks** - Full lifecycle management via REST API
-- **Dynamic Routing** - Path-based and domain-based routing without config files
-- **External Integration** - Route to non-Docker services (internal APIs, external SaaS, S3 buckets)
-- **State Management** - Persistent SQLite database with automatic recovery
+- **Origin Mapping** (like CloudFront) - Route domains to multiple backends (containers, URLs, S3)
+- **Path-based Routing** (like API Gateway) - `/api` → Lambda, `/auth` → external SaaS, `/` → frontend
+- **Lambda Runtime** - Run AWS Lambda container images as persistent services
+- **SSL/TLS Automation** - Let's Encrypt certificates with auto-renewal
+- **Multi-Environment Portability** - Same Lambda images run in AWS Lambda AND Stack App
+- **Infrastructure as Code** - Entire routing configuration via JSON API
 
-**Real-World Example:**
+**Real-World Example (CloudFront-style Origin Mapping):**
 ```
-example.com           → Your main website (Docker container)
-example.com/api       → Internal API server (https://api.internal:8080)
-example.com/auth      → External auth service (https://auth.saas.com)
-example.com/media     → S3 bucket (https://bucket.s3.amazonaws.com)
+example.com           → Docker container (like CF Origin: ALB)
+example.com/api       → Lambda container (like CF Origin: API Gateway)
+example.com/auth      → External auth SaaS (like CF Origin: Custom HTTP)
+example.com/media     → S3 bucket (like CF Origin: S3)
 ```
-All configured through a single JSON API call. SSL certificates automatically provisioned. No config files to edit.
+All configured through a single JSON API call. SSL certificates automatically provisioned. No AWS required.
 
 ## Key Features
 
@@ -47,11 +49,13 @@ Deploy Stack App, and it automatically creates and manages the Traefik reverse p
 - Monitor real-time container status
 - Access centralized logs
 
-### 🌐 Intelligent Reverse Proxy
-- **Docker Service Routes**: Automatic Traefik label generation for containerized services
-- **External Routes**: Route traffic to non-Docker targets (localhost ports, LAN servers, external APIs)
-- **System Routes**: Pre-configured access to Stack App API and Traefik dashboard
-- **Domain Routing**: Host-based and path-based routing rules
+### 🌐 CloudFront-Style Origin Routing
+- **Container Origins**: Route to Docker containers (like CF → ALB)
+- **External Origins**: Route to any HTTP/HTTPS endpoint (like CF → Custom Origin)
+- **Lambda Origins**: Run Lambda container images (like CF → API Gateway → Lambda)
+- **S3 Origins**: Route to S3 buckets or any static hosting
+- **Path Patterns**: Priority-based routing (e.g., `/api` before `/`)
+- **Domain Mapping**: Multiple domains and subdomains
 - **SSL/TLS**: Automatic Let's Encrypt certificates with auto-renewal
 
 ### 🔐 Security
@@ -119,6 +123,53 @@ graph TB
     style ManagedContainers fill:#f3e5f5
     style ExternalTargets fill:#fce4ec
 ```
+
+---
+
+## AWS Comparison: Stack App vs CloudFront + API Gateway + Lambda
+
+Stack App provides AWS-like routing and orchestration on your own infrastructure:
+
+| AWS Service | Stack App Equivalent | Capability |
+|------------|---------------------|------------|
+| **CloudFront Distribution** | Stack with routes | Domain → multiple origins mapping |
+| **CloudFront Origins** | `serviceId` or `externalTarget` | Route to containers, APIs, S3, etc. |
+| **CloudFront Path Patterns** | Route `pathPrefix` + `priority` | `/api/*`, `/auth/*` routing |
+| **API Gateway** | Traefik path-based routing | HTTP routing, SSL termination |
+| **Lambda Functions** | Lambda container images | Run same Lambda images locally |
+| **AWS Certificate Manager** | Let's Encrypt automation | Free SSL certificates |
+| **Lambda Function URLs** | Route `externalTarget` | Proxy to actual Lambda functions |
+
+**Key Difference:** Stack App runs on **your infrastructure** - no AWS lock-in, no per-request pricing, full control.
+
+**Key Similarity:** Using **AWS Lambda Web Adapter**, the **same container image** runs in both AWS Lambda (serverless) and Stack App (persistent containers) with **zero code changes**.
+
+### Example: AWS vs Stack App
+
+**AWS Setup:**
+```
+CloudFront Distribution (example.com)
+├─ Origin: ALB → EC2 instances (/)
+├─ Origin: API Gateway → Lambda (/api)
+├─ Origin: S3 bucket (/media)
+└─ Origin: auth.external.com (/auth)
+```
+
+**Stack App Equivalent:**
+```json
+{
+  "id": "example-com",
+  "services": [{"id": "frontend", "image": "nginx"}],
+  "routes": [
+    {"serviceId": "frontend", "domains": ["example.com"], "port": 80},
+    {"externalTarget": "https://lambda-url.on.aws", "pathPrefix": "/api"},
+    {"externalTarget": "https://bucket.s3.amazonaws.com", "pathPrefix": "/media"},
+    {"externalTarget": "https://auth.external.com", "pathPrefix": "/auth"}
+  ]
+}
+```
+
+Same architecture, your infrastructure, one API call.
 
 ---
 

@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Stack App** - Production-Ready Docker Infrastructure Manager
+**Stack App** - CloudFront + API Gateway + Lambda for Your Own Infrastructure
 
-A single-container solution that transforms a Docker host into a production-ready platform with automatic reverse proxy, SSL certificates, and intelligent routing.
+A single-container solution that transforms a Docker host into AWS-like edge infrastructure with CloudFront-style origin mapping, API Gateway-style routing, and Lambda container runtime.
 
 **Status:** Initial planning phase - implementation not yet started.
 
@@ -14,23 +14,35 @@ A single-container solution that transforms a Docker host into a production-read
 
 ## What Stack App Does
 
-Deploy one container and get:
-- Automatic Traefik reverse proxy deployment
-- SSL/TLS certificate automation via Let's Encrypt
-- Full Docker stack lifecycle management via REST API
-- Dynamic routing for containerized services
-- External proxy routing to non-Docker targets (APIs, S3, etc.)
-- Priority-based path and domain routing
-- Multiple SSL providers per stack
+**Think of it as:** Local CloudFront + API Gateway + Lambda
 
-**Real-World Example:**
+Deploy one container and get:
+- **Origin Mapping** (like CloudFront) - Route domains to multiple backends (containers, URLs, Lambda, S3)
+- **Path-based Routing** (like API Gateway) - Priority-based routing with `/api`, `/auth`, etc.
+- **Lambda Runtime** - Run AWS Lambda container images as persistent services
+- **SSL/TLS Automation** - Let's Encrypt certificates (like AWS Certificate Manager)
+- **Multi-Environment Portability** - Same Lambda images run in AWS Lambda AND Stack App
+- **Infrastructure as Code** - Entire routing configuration via JSON REST API
+
+**AWS Comparison:**
+
+| AWS Service | Stack App Equivalent |
+|------------|---------------------|
+| CloudFront Distribution | Stack with routes |
+| CloudFront Origins | `serviceId` (containers) or `externalTarget` (URLs) |
+| CloudFront Path Patterns | Route `pathPrefix` + `priority` |
+| API Gateway | Traefik path-based routing |
+| Lambda Functions | Lambda container images |
+| ACM Certificates | Let's Encrypt automation |
+
+**Real-World Example (CloudFront-style):**
 ```
-example.com           → Docker container (your website)
-example.com/api       → Internal API server (https://api.internal:8080)
-example.com/auth      → External SaaS (https://auth.saas.com)
-example.com/media     → S3 bucket (https://bucket.s3.amazonaws.com)
+example.com           → Docker container (like CF Origin: ALB)
+example.com/api       → Lambda container (like CF Origin: API Gateway → Lambda)
+example.com/auth      → External SaaS (like CF Origin: Custom HTTP)
+example.com/media     → S3 bucket (like CF Origin: S3)
 ```
-All configured via single JSON API call with automatic SSL certificates.
+All configured via single JSON API call. Same Lambda images run in AWS Lambda (serverless) and Stack App (persistent).
 
 ## Architecture
 
@@ -66,6 +78,13 @@ Stack App  Managed Containers + External Targets
 
 ### Key Design Patterns
 
+- **CloudFront-Style Origins:** Routes map domains to origins (containers or external URLs)
+- **Origin Types:**
+  - **Container Origins:** `serviceId` → Docker containers (like CF → ALB)
+  - **External Origins:** `externalTarget` → HTTP/HTTPS URLs (like CF → Custom Origin)
+  - **Lambda Origins:** Lambda container images (like CF → API Gateway → Lambda)
+  - **S3 Origins:** S3 buckets or static hosting (like CF → S3)
+- **Path Patterns:** Route `pathPrefix` + `priority` (like CloudFront path patterns)
 - **Naming Convention:** Container names follow `{stack-id}-{service-id}` pattern (max 63 chars total)
 - **Validation:** Stack/service IDs use pattern `^[a-z0-9]+(?:-[a-z0-9]+)*$` (1-31 chars)
 - **Authentication:** API key via `X-API-Key` header (all endpoints except `/health`)
@@ -522,16 +541,19 @@ Complete requirements specification organized as:
 
 ## Key Implementation Notes
 
-1. **Routes are part of Stack config**, not separate entities
-2. **External routes are stacks with empty services array**
-3. **Priority field controls Traefik evaluation order** (100 before 90 before 1)
-4. **XOR constraint on routes**: Either serviceId OR externalTarget, never both
-5. **Container naming**: `{stack-id}-{service-id}` must be ≤ 63 chars
-6. **System routes** `/stack` and `/traefik` are configurable
-7. **Traefik auto-deploys** on Stack App startup
-8. **Service routes** use Docker labels, **external routes** use file provider
-9. **Multiple SSL providers** can be used in single stack (different routes)
-10. **stripPrefix** removes path before forwarding (useful for external routes)
+1. **CloudFront-style architecture**: Think of Stack as a CloudFront distribution, Routes as origins
+2. **Origin types**: Container origins (serviceId) or external origins (externalTarget)
+3. **Routes are part of Stack config**, not separate entities
+4. **External routes are stacks with empty services array** (pure proxy stacks)
+5. **Priority field controls Traefik evaluation order** (100 before 90 before 1) - like CloudFront path patterns
+6. **XOR constraint on routes**: Either serviceId OR externalTarget, never both
+7. **Container naming**: `{stack-id}-{service-id}` must be ≤ 63 chars
+8. **System routes** `/stack` and `/traefik` are configurable
+9. **Traefik auto-deploys** on Stack App startup
+10. **Service routes** use Docker labels, **external routes** use file provider
+11. **Multiple SSL providers** can be used in single stack (different routes)
+12. **stripPrefix** removes path before forwarding (useful for external routes)
+13. **Lambda portability**: Same Lambda container image works in AWS Lambda AND Stack App (with AWS Lambda Web Adapter)
 
 ## Development Workflow
 
