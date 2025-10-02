@@ -426,101 +426,43 @@ sudo iptables-save
 
 ## Usage Examples
 
-### Create a Stack with Services
+**📖 Comprehensive Examples:** See [Requirements Examples](requirements/examples/) for detailed real-world configurations:
+- **[Full Stack Application](requirements/examples/full-stack.md)** - Complete web app with mixed container and external routing
+- **[Lambda Containers](requirements/examples/lambda-container.md)** - Running AWS Lambda container images
+- **[Internal Services](requirements/examples/internal-services.md)** - Private network deployment with DNS-01 SSL
+
+**Quick Reference:**
 
 ```bash
+# Create a stack with services and routes
 curl -X POST http://your-server/stack/api/v1/stacks \
   -H "X-API-Key: your-api-key-here" \
   -H "Content-Type: application/json" \
   -d '{
     "id": "web-app",
-    "services": [
-      {
-        "id": "frontend",
-        "image": "nginx:latest",
-        "containerConfig": {
-          "ports": [
-            {
-              "name": "http",
-              "containerPort": 80
-            }
-          ],
-          "proxy": {
-            "enabled": true,
-            "domains": ["example.com", "www.example.com"],
-            "port": 80,
-            "ssl": true,
-            "redirectToHttps": true
-          }
-        }
-      },
-      {
-        "id": "backend",
-        "image": "node:18-alpine",
-        "containerConfig": {
-          "ports": [
-            {
-              "name": "api",
-              "containerPort": 3000
-            }
-          ],
-          "environment": {
-            "NODE_ENV": "production",
-            "PORT": "3000"
-          },
-          "proxy": {
-            "enabled": true,
-            "domains": ["api.example.com"],
-            "port": 3000,
-            "ssl": true
-          }
-        }
+    "services": [{
+      "id": "frontend",
+      "image": "nginx:latest",
+      "containerConfig": {
+        "ports": [{"name": "http", "containerPort": 80}]
       }
-    ]
+    }],
+    "routes": [{
+      "name": "main",
+      "serviceId": "frontend",
+      "domains": ["example.com"],
+      "port": 80,
+      "ssl": {"enabled": true, "provider": "letsencrypt"},
+      "priority": 100
+    }]
   }'
-```
 
-### Start a Stack
-
-```bash
+# Start the stack
 curl -X POST http://your-server/stack/api/v1/stacks/web-app/start \
   -H "X-API-Key: your-api-key-here"
-```
 
-### Get Stack Status
-
-```bash
+# Check status
 curl http://your-server/stack/api/v1/stacks/web-app/status \
-  -H "X-API-Key: your-api-key-here"
-```
-
-### Create External Route (Non-Docker Target)
-
-```bash
-# Route traffic to a service running on host port 8080
-curl -X POST http://your-server/stack/api/v1/proxy/external-routes \
-  -H "X-API-Key: your-api-key-here" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "legacy-app",
-    "domains": ["legacy.example.com"],
-    "target": "http://localhost:8080",
-    "ssl": true,
-    "redirectToHttps": true
-  }'
-```
-
-### List All Proxy Routes
-
-```bash
-curl http://your-server/stack/api/v1/proxy/routes \
-  -H "X-API-Key: your-api-key-here"
-```
-
-### View SSL Certificates
-
-```bash
-curl http://your-server/stack/api/v1/proxy/certificates \
   -H "X-API-Key: your-api-key-here"
 ```
 
@@ -528,47 +470,50 @@ curl http://your-server/stack/api/v1/proxy/certificates \
 
 ## API Endpoints
 
-### Stack Management
-- `GET /api/v1/stacks` - List all stacks
-- `POST /api/v1/stacks` - Create new stack
-- `GET /api/v1/stacks/{stackId}` - Get stack details
-- `PUT /api/v1/stacks/{stackId}` - Update stack
-- `DELETE /api/v1/stacks/{stackId}` - Delete stack
+Stack App provides a comprehensive REST API for managing stacks, services, and routes.
 
-### Stack Lifecycle
-- `POST /api/v1/stacks/{stackId}/start` - Start stack
-- `POST /api/v1/stacks/{stackId}/stop` - Stop stack
-- `POST /api/v1/stacks/{stackId}/restart` - Restart stack
-- `GET /api/v1/stacks/{stackId}/status` - Get status
+**Key Endpoint Categories:**
+- **Stack Management** - Create, read, update, delete stacks
+- **Stack Lifecycle** - Start, stop, restart operations
+- **Service Management** - View service details and logs
+- **Proxy Management** - Manage routes and SSL certificates
+- **Health & Monitoring** - Health checks and status
 
-### Logging
-- `GET /api/v1/stacks/{stackId}/logs` - Get stack logs
-- `GET /api/v1/stacks/{stackId}/services/{serviceId}/logs` - Get service logs
+**📖 Complete API Reference:** See [API Specification](requirements/api-specification.md) for detailed endpoint documentation with request/response formats and examples.
 
-### External Routes
-- `GET /api/v1/proxy/external-routes` - List external routes
-- `POST /api/v1/proxy/external-routes` - Create external route
-- `GET /api/v1/proxy/external-routes/{routeId}` - Get route details
-- `PUT /api/v1/proxy/external-routes/{routeId}` - Update route
-- `DELETE /api/v1/proxy/external-routes/{routeId}` - Delete route
+**Quick Examples:**
+```bash
+# List all stacks
+GET /api/v1/stacks
 
-### Proxy Management
-- `GET /api/v1/proxy/routes` - List all proxy routes
-- `GET /api/v1/proxy/certificates` - List SSL certificates
-- `POST /api/v1/proxy/certificates/{domain}/renew` - Renew certificate
+# Create a stack
+POST /api/v1/stacks
 
-### Authentication
-- `GET /api/v1/auth/verify` - Verify API key (used by Traefik ForwardAuth)
+# Start a stack
+POST /api/v1/stacks/{stackId}/start
 
-### Health
-- `GET /health` - Health check (no authentication required)
+# Get stack status
+GET /api/v1/stacks/{stackId}/status
+
+# View SSL certificates
+GET /api/v1/proxy/certificates
+```
 
 ---
 
 ## Configuration Reference
 
-### Minimal Configuration
+Stack App uses YAML configuration files for application settings, database configuration, and proxy defaults.
 
+**Configuration File Locations (priority order):**
+1. CLI parameter: `--config /path/to/config.yaml`
+2. Environment: `STACK_APP_CONFIG=/path/to/config.yaml`
+3. `/etc/stack-app/config.yaml`
+4. `/etc/stack-app/config.json`
+
+**📖 Complete Configuration Schema:** See [Requirements - Deployment Configuration](requirements/index.md#6-deployment-requirements) for the full configuration reference.
+
+**Minimal Example:**
 ```yaml
 api:
   port: 3001
@@ -581,9 +526,7 @@ proxy:
     email: admin@example.com
 ```
 
-### Complete Configuration
-
-See [REQUIREMENTS.md](REQUIREMENTS.md) section 7.3 for full configuration schema.
+**Quick Start:** See the [Quick Start](#quick-start) section above for a complete configuration example.
 
 ---
 
@@ -680,36 +623,55 @@ Stack App automatically manages SSL certificates via Let's Encrypt:
 
 - ✅ Automatic certificate provisioning
 - ✅ Automatic renewal (90-day expiry)
-- ✅ HTTP-01 or TLS-ALPN-01 challenge support
-- ✅ Wildcard certificates (with DNS challenge - future)
+- ✅ HTTP-01, TLS-ALPN-01, and DNS-01 challenge support
+- ✅ Wildcard certificates (with DNS-01 challenge)
+- ✅ Custom certificate support
 - ✅ Certificate status monitoring
-- ✅ Manual renewal endpoint
 
-### Certificate Staging
+**📖 SSL Configuration Details:** See [Data Models - SSL Configuration](requirements/data-models.md#ssl-configuration) for complete schema and options.
 
-For testing, use Let's Encrypt staging environment:
-
+**Quick Examples:**
 ```yaml
-proxy:
-  ssl:
-    staging: true  # Use staging certificates
+# Let's Encrypt (HTTP-01)
+ssl:
+  enabled: true
+  provider: letsencrypt
+  email: admin@example.com
+  challengeType: http
+
+# DNS-01 for internal domains or wildcards
+ssl:
+  enabled: true
+  provider: letsencrypt
+  challengeType: dns
+  dnsProvider: cloudflare
+
+# Custom certificate
+ssl:
+  enabled: true
+  provider: custom
+  customCert:
+    certFile: /path/to/cert.pem
+    keyFile: /path/to/key.pem
 ```
 
 ---
 
 ## Database and Persistence
 
-Stack App uses SQLite for persistent storage:
+Stack App uses SQLite for persistent storage of all stack, service, and route configurations.
 
-- **Location:** `/var/lib/stack-app/stacks.db`
-- **Stores:**
-  - Stack definitions
-  - Service configurations
-  - Proxy routes
-  - External routes
-  - SSL certificate metadata
+**Database Location:** `/var/lib/stack-app/stacks.db`
 
-**Backup:**
+**📖 Database Schema:** See [Database Schema](requirements/database-schema.md) for complete table definitions, indexes, and relationships.
+
+**What's Stored:**
+- Stack definitions and metadata
+- Service configurations (container config as JSON)
+- Route configurations (service routes + external routes)
+- SSL certificate metadata
+
+**Backup Example:**
 ```bash
 # Stop Stack App
 docker stop stack-app
