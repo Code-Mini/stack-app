@@ -605,6 +605,29 @@ Stack App automatically configures two system routes:
 
 Both routes can be customized or disabled in configuration.
 
+### Usage Examples
+
+```bash
+# Access Stack App API via system route (works on any configured domain)
+curl https://example.com/stack/api/v1/stacks \
+  -H "X-API-Key: your-api-key-here"
+
+# Create a stack via system route
+curl -X POST https://example.com/stack/api/v1/stacks \
+  -H "X-API-Key: your-api-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{"id": "my-app", "services": [...], "routes": [...]}'
+
+# Access Traefik dashboard
+# Open in browser: https://example.com/traefik/dashboard/
+
+# Direct API access (bypasses Traefik)
+curl http://your-server:3001/api/v1/stacks \
+  -H "X-API-Key: your-api-key-here"
+```
+
+**Note:** System routes work on ANY domain pointing to Traefik, making API access convenient without exposing port 3001 directly.
+
 ---
 
 ## Routing Types

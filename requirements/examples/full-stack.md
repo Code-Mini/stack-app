@@ -357,6 +357,41 @@ curl http://your-server/stack/api/v1/stacks/example-com/status \
   -H "X-API-Key: your-api-key-here"
 ```
 
+## Accessing Stack App via System Routes
+
+Stack App automatically configures system routes that allow you to access the API and Traefik dashboard through the reverse proxy on any configured domain:
+
+```bash
+# Access Stack App API via system route (instead of direct port access)
+# Works on any domain that points to Traefik
+curl https://example.com/stack/api/v1/stacks \
+  -H "X-API-Key: your-api-key-here"
+
+# List all stacks via system route
+curl https://example.com/stack/api/v1/stacks \
+  -H "X-API-Key: your-api-key-here"
+
+# Get stack status via system route
+curl https://example.com/stack/api/v1/stacks/example-com/status \
+  -H "X-API-Key: your-api-key-here"
+
+# Access Traefik dashboard (requires API key authentication)
+# Open in browser: https://example.com/traefik/dashboard/
+
+# View all routes via system route
+curl https://example.com/stack/api/v1/proxy/routes \
+  -H "X-API-Key: your-api-key-here"
+```
+
+**System Routes Configured:**
+- `{any-domain}/stack/*` → Stack App API (path prefix stripped)
+- `{any-domain}/traefik/*` → Traefik dashboard (path prefix stripped, requires auth)
+
+These routes work on **any domain** pointing to Traefik, including:
+- `https://example.com/stack/api/v1/stacks`
+- `https://www.example.com/stack/api/v1/stacks`
+- `http://your-server-ip/stack/api/v1/stacks`
+
 ## Verification
 
 ```bash

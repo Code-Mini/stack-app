@@ -173,6 +173,13 @@ Stack App is a self-contained infrastructure management system that orchestrates
 - Custom header injection
 - Health check integration
 
+**Lambda Container Portability:**
+- Run AWS Lambda container images as persistent services
+- Support for AWS Lambda Web Adapter for multi-environment portability
+- Same container image works in AWS Lambda (serverless) and Stack App (persistent containers) with zero code changes
+- Compatible with Lambda Runtime Interface Emulator
+- Standard web framework code (Express, Flask, Spring Boot) runs anywhere
+
 #### Use Cases
 
 **Use Case 1: Full-Stack Web Application**

@@ -374,7 +374,15 @@ curl -X POST http://your-server/stack/api/v1/stacks/lambda-services/start \
 # Check status
 curl http://your-server/stack/api/v1/stacks/lambda-services/status \
   -H "X-API-Key: your-api-key-here"
+
+# Alternative: Access via system route (works on any configured domain)
+curl https://api.example.com/stack/api/v1/stacks/lambda-services/status \
+  -H "X-API-Key: your-api-key-here"
 ```
+
+**Note:** Stack App API is accessible via:
+- **Direct:** `http://your-server:3001/api/v1/*` (bypasses Traefik)
+- **System Route:** `https://{any-domain}/stack/api/v1/*` (via Traefik, uses SSL)
 
 ---
 
