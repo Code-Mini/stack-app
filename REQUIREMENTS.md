@@ -355,45 +355,24 @@ Integrated Traefik reverse proxy management for HTTP/HTTPS routing with automati
 - **Behavior:** Unhealthy services automatically removed from routing
 - **Priority:** Medium
 
-**FR-3.6.11:** Create External Route
+**FR-3.6.11:** External Proxy Routes via Stacks
 - **ID:** REQ-024
-- **Description:** Create proxy route to external URL or host port (non-Docker targets)
-- **Input:** POST /api/v1/proxy/external-routes with route configuration
-- **Output:** Created external route object
-- **Behavior:** Routes traffic to external targets without Docker container
+- **Description:** Create proxy routes to external URLs or host ports using stacks with routes but no services
+- **Input:** POST /api/v1/stacks with routes array and empty services array
+- **Output:** Created stack object with routes
+- **Behavior:**
+  - Stacks with routes.externalTarget create Traefik file provider configuration
+  - No Docker containers created (services array is empty or omitted)
+  - Routes traffic to external targets (localhost ports, LAN servers, external APIs)
 - **Validation:**
-  - Target URL must be valid HTTP/HTTPS URL or host:port format
-  - Domain/path combination must be unique
+  - Stack must have at least one route with externalTarget specified
+  - External target must be valid HTTP/HTTPS URL or host:port format
+  - Domain/path combination must be unique across all stacks
+- **Examples:**
+  - Route to localhost service: `externalTarget: "http://localhost:8080"`
+  - Route to LAN server: `externalTarget: "http://192.168.1.50:3000"`
+  - Route to external API: `externalTarget: "https://api.external.com/v1"`
 - **Priority:** High
-
-**FR-3.6.12:** List External Routes
-- **ID:** REQ-025
-- **Description:** Retrieve all configured external routes
-- **Input:** GET /api/v1/proxy/external-routes
-- **Output:** Array of external route objects
-- **Priority:** Medium
-
-**FR-3.6.13:** Get External Route Details
-- **ID:** REQ-026
-- **Description:** Retrieve specific external route by ID
-- **Input:** GET /api/v1/proxy/external-routes/{routeId}
-- **Output:** External route object with configuration
-- **Priority:** Medium
-
-**FR-3.6.14:** Update External Route
-- **ID:** REQ-027
-- **Description:** Modify existing external route configuration
-- **Input:** PUT /api/v1/proxy/external-routes/{routeId} with updated configuration
-- **Output:** Updated external route object
-- **Priority:** Medium
-
-**FR-3.6.15:** Delete External Route
-- **ID:** REQ-028
-- **Description:** Remove external route
-- **Input:** DELETE /api/v1/proxy/external-routes/{routeId}
-- **Output:** Success confirmation with route ID
-- **Behavior:** Removes Traefik configuration for external route
-- **Priority:** Medium
 
 ### 3.7 Built-in System Routes
 
@@ -546,6 +525,10 @@ Stack:
     services:
       type: array
       items: { $ref: '#/Service' }
+    routes:
+      type: array
+      items: { $ref: '#/StackRoute' }
+      description: "Optional - array of reverse proxy routes for stack services"
     createdAt:
       type: string
       format: date-time
@@ -608,33 +591,36 @@ ContainerConfiguration:
         properties:
           hostPath: { type: string }
           containerPath: { type: string }
-    proxy:
-      $ref: '#/ProxyConfiguration'
-      description: "Optional - reverse proxy routing configuration"
 ```
 
-#### 6.1.4 Proxy Configuration
+#### 6.1.4 Stack Route Object
 ```yaml
-ProxyConfiguration:
+StackRoute:
   properties:
-    enabled:
-      type: boolean
-      default: false
-      description: "Enable reverse proxy routing for this service"
+    name:
+      type: string
+      description: "Route identifier (unique within stack)"
+      pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+    serviceId:
+      type: string
+      description: "ID of the service this route points to (for container routes)"
+    externalTarget:
+      type: string
+      description: "External target URL for non-container routes (e.g., 'http://localhost:8080', 'https://api.external.com')"
     domains:
       type: array
       items: { type: string }
       description: "Domain names for routing (e.g., ['example.com', 'www.example.com'])"
+      minItems: 1
     pathPrefix:
       type: string
       description: "Optional URL path prefix (e.g., '/api', '/admin')"
     port:
       type: integer
-      description: "Container port to route traffic to"
+      description: "Container port to route traffic to (required for serviceId routes, ignored for externalTarget routes)"
     ssl:
-      type: boolean
-      default: false
-      description: "Enable SSL/TLS with automatic Let's Encrypt certificate"
+      $ref: '#/SSLConfiguration'
+      description: "SSL/TLS configuration for this route"
     redirectToHttps:
       type: boolean
       default: true
@@ -661,58 +647,53 @@ ProxyConfiguration:
     priority:
       type: integer
       description: "Router priority (higher = evaluated first)"
+      default: 0
+
+Note: Either serviceId OR externalTarget must be specified, but not both.
+- serviceId: Route to a container service within the stack
+- externalTarget: Route to external URL (for proxy-only stacks with no services)
 ```
 
-#### 6.1.5 External Route Object
+#### 6.1.5 SSL Configuration
 ```yaml
-ExternalRoute:
+SSLConfiguration:
   properties:
-    id:
+    enabled:
+      type: boolean
+      default: false
+      description: "Enable SSL/TLS for this route"
+    provider:
       type: string
-      description: "Unique identifier for the external route"
-    name:
+      enum: [letsencrypt, letsencrypt-staging, custom]
+      default: letsencrypt
+      description: "Certificate provider/resolver to use"
+    certResolver:
       type: string
-      description: "Human-readable name for the route"
+      description: "Custom Traefik certificate resolver name (overrides provider)"
     domains:
       type: array
       items: { type: string }
-      description: "Domain names for routing"
-    pathPrefix:
+      description: "Domains for certificate (defaults to route domains if not specified)"
+    email:
       type: string
-      description: "Optional URL path prefix"
-    target:
+      format: email
+      description: "Email for Let's Encrypt notifications (uses global config if not specified)"
+    challengeType:
       type: string
-      description: "Target URL or host:port (e.g., 'http://localhost:8080', 'http://192.168.1.100:3000', 'https://api.example.com')"
-    ssl:
-      type: boolean
-      default: false
-      description: "Enable SSL/TLS with automatic Let's Encrypt certificate"
-    redirectToHttps:
-      type: boolean
-      default: true
-      description: "Redirect HTTP to HTTPS when SSL enabled"
-    stripPrefix:
-      type: boolean
-      default: false
-      description: "Remove path prefix before forwarding to target"
-    headers:
+      enum: [http, tlsalpn, dns]
+      default: http
+      description: "ACME challenge type for certificate verification"
+    dnsProvider:
+      type: string
+      description: "DNS provider for DNS-01 challenge (e.g., 'cloudflare', 'route53')"
+    customCert:
       type: object
-      additionalProperties: { type: string }
-      description: "Custom HTTP headers to add to requests"
-    middleware:
-      type: array
-      items: { type: string }
-      description: "Traefik middleware names to apply"
-    priority:
-      type: integer
-      description: "Router priority (higher = evaluated first)"
-    createdAt:
-      type: string
-      format: date-time
-    updatedAt:
-      type: string
-      format: date-time
+      description: "Custom certificate configuration (when provider is 'custom')"
+      properties:
+        certFile: { type: string, description: "Path to certificate file" }
+        keyFile: { type: string, description: "Path to private key file" }
 ```
+
 
 ### 6.2 Database Schema
 
@@ -741,23 +722,45 @@ CREATE TABLE services (
 );
 ```
 
-#### 6.2.3 Proxy Routes Table
+#### 6.2.3 Stack Routes Table
 ```sql
-CREATE TABLE proxy_routes (
+CREATE TABLE stack_routes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    service_id TEXT NOT NULL,
+    route_name TEXT NOT NULL,
     stack_id TEXT NOT NULL,
-    domain TEXT NOT NULL,
+    service_id TEXT,
+    external_target TEXT,
+    domains_json TEXT NOT NULL,
     path_prefix TEXT,
-    port INTEGER NOT NULL,
+    port INTEGER,
     ssl_enabled BOOLEAN DEFAULT 0,
-    ssl_cert_path TEXT,
-    ssl_cert_expiry DATETIME,
+    ssl_provider TEXT DEFAULT 'letsencrypt',
+    ssl_cert_resolver TEXT,
+    ssl_challenge_type TEXT DEFAULT 'http',
+    ssl_dns_provider TEXT,
+    ssl_email TEXT,
+    ssl_custom_cert_path TEXT,
+    ssl_custom_key_path TEXT,
+    redirect_to_https BOOLEAN DEFAULT 1,
+    strip_prefix BOOLEAN DEFAULT 0,
+    headers_json TEXT,
+    middleware_json TEXT,
+    healthcheck_json TEXT,
+    priority INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (service_id, stack_id) REFERENCES services(id, stack_id) ON DELETE CASCADE,
-    UNIQUE (domain, path_prefix)
+    FOREIGN KEY (stack_id) REFERENCES stacks(id) ON DELETE CASCADE,
+    UNIQUE (stack_id, route_name),
+    CHECK ((service_id IS NOT NULL AND external_target IS NULL) OR (service_id IS NULL AND external_target IS NOT NULL))
 );
+
+CREATE INDEX idx_stack_routes_domain ON stack_routes(domains_json);
+CREATE INDEX idx_stack_routes_stack ON stack_routes(stack_id);
+CREATE INDEX idx_stack_routes_service ON stack_routes(service_id);
+
+COMMENT ON COLUMN stack_routes.service_id IS 'ID of service within stack (for container routes)';
+COMMENT ON COLUMN stack_routes.external_target IS 'External URL target (for proxy-only routes)';
+COMMENT ON COLUMN stack_routes.port IS 'Container port (required for service_id routes)';
 ```
 
 #### 6.2.4 SSL Certificates Table
@@ -772,27 +775,6 @@ CREATE TABLE ssl_certificates (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
-```
-
-#### 6.2.5 External Routes Table
-```sql
-CREATE TABLE external_routes (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    target_url TEXT NOT NULL,
-    domains_json TEXT NOT NULL,
-    path_prefix TEXT,
-    ssl_enabled BOOLEAN DEFAULT 0,
-    redirect_to_https BOOLEAN DEFAULT 1,
-    strip_prefix BOOLEAN DEFAULT 0,
-    headers_json TEXT,
-    middleware_json TEXT,
-    priority INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_external_routes_domain ON external_routes(domains_json);
 ```
 
 ### 6.3 Validation Rules
@@ -967,11 +949,28 @@ command:
   - "--providers.file.watch=true"
   - "--entrypoints.web.address=:80"
   - "--entrypoints.websecure.address=:443"
+  # Certificate resolvers (configured based on Stack App config)
   - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
   - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
   - "--certificatesresolvers.letsencrypt.acme.email=admin@example.com"
-  - "--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/certs/acme.json"
+  - "--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/certs/acme-letsencrypt.json"
+  # Staging resolver
+  - "--certificatesresolvers.letsencrypt-staging.acme.httpchallenge=true"
+  - "--certificatesresolvers.letsencrypt-staging.acme.httpchallenge.entrypoint=web"
+  - "--certificatesresolvers.letsencrypt-staging.acme.email=admin@example.com"
+  - "--certificatesresolvers.letsencrypt-staging.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+  - "--certificatesresolvers.letsencrypt-staging.acme.storage=/etc/traefik/certs/acme-staging.json"
+  # DNS resolver example (Cloudflare)
+  - "--certificatesresolvers.cloudflare-dns.acme.dnschallenge=true"
+  - "--certificatesresolvers.cloudflare-dns.acme.dnschallenge.provider=cloudflare"
+  - "--certificatesresolvers.cloudflare-dns.acme.email=admin@example.com"
+  - "--certificatesresolvers.cloudflare-dns.acme.storage=/etc/traefik/certs/acme-cloudflare.json"
 restart: unless-stopped
+
+# Environment variables for DNS providers
+environment:
+  - CF_API_EMAIL=admin@example.com  # Cloudflare email
+  - CF_DNS_API_TOKEN=your-token-here  # Cloudflare API token
 ```
 
 **DOCK-008: Traefik Dashboard Configuration**
@@ -1116,7 +1115,7 @@ logging:
 
 ### 8.2 API Response Examples
 
-#### 8.2.1 Success Response (Stack Creation with Proxy)
+#### 8.2.1 Success Response (Stack with Multiple Routes)
 ```json
 {
   "id": "web-stack",
@@ -1139,28 +1138,77 @@ logging:
         "environment": {
           "NODE_ENV": "production"
         },
-        "volumes": [],
-        "proxy": {
-          "enabled": true,
-          "domains": ["example.com", "www.example.com"],
-          "port": 80,
-          "ssl": true,
-          "redirectToHttps": true,
-          "headers": {
-            "X-Custom-Header": "value"
-          },
-          "healthCheck": {
-            "enabled": true,
-            "path": "/health",
-            "interval": "30s",
-            "timeout": "5s"
-          }
-        }
+        "volumes": []
       }
+    }
+  ],
+  "routes": [
+    {
+      "name": "production",
+      "serviceId": "app",
+      "domains": ["example.com", "www.example.com"],
+      "port": 80,
+      "ssl": {
+        "enabled": true,
+        "provider": "letsencrypt",
+        "challengeType": "http"
+      },
+      "redirectToHttps": true,
+      "headers": {
+        "X-Frame-Options": "DENY"
+      }
+    },
+    {
+      "name": "staging",
+      "serviceId": "app",
+      "domains": ["staging.example.com"],
+      "port": 80,
+      "ssl": {
+        "enabled": true,
+        "provider": "letsencrypt-staging",
+        "challengeType": "http"
+      },
+      "redirectToHttps": true
     }
   ],
   "createdAt": "2025-10-02T10:30:00.000Z",
   "updatedAt": "2025-10-02T10:30:00.000Z"
+}
+```
+
+#### 8.2.1b External Proxy Stack (Routes Only, No Services)
+```json
+{
+  "id": "external-proxies",
+  "name": "external-proxies",
+  "services": [],
+  "routes": [
+    {
+      "name": "legacy-app",
+      "externalTarget": "http://localhost:8080",
+      "domains": ["legacy.example.com"],
+      "ssl": {
+        "enabled": true,
+        "provider": "letsencrypt"
+      },
+      "redirectToHttps": true
+    },
+    {
+      "name": "lan-service",
+      "externalTarget": "http://192.168.1.50:3000",
+      "domains": ["internal.example.com"],
+      "pathPrefix": "/api",
+      "ssl": {
+        "enabled": true,
+        "provider": "letsencrypt",
+        "challengeType": "dns",
+        "dnsProvider": "cloudflare"
+      },
+      "stripPrefix": true
+    }
+  ],
+  "createdAt": "2025-10-02T11:00:00.000Z",
+  "updatedAt": "2025-10-02T11:00:00.000Z"
 }
 ```
 
