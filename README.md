@@ -1,23 +1,39 @@
-# Stack App - Docker Stack Management API
+# Stack App - Production-Ready Docker Infrastructure Manager
 
 **Version:** 1.1
 **Status:** Planning Phase
 
-A comprehensive RESTful API service for managing Docker container stacks with integrated Traefik reverse proxy, automatic SSL/TLS certificates, and dynamic routing management.
+Deploy one container. Get a complete production infrastructure.
+
+Stack App transforms your Docker host into a production-ready platform with automatic reverse proxy, SSL certificates, and intelligent routing. Deploy complex multi-service applications, route to external APIs, and manage everything through a single REST API—all from one container.
 
 ---
 
-## Overview
+## What It Does
 
-Stack App is a single-container solution that provides complete infrastructure management for Docker-based applications. Deploy one container, and Stack App automatically sets up and manages:
+Stack App is infrastructure-as-code for Docker, packaged as a single container. It eliminates the complexity of manually configuring reverse proxies, SSL certificates, and container orchestration.
 
-- **Traefik Reverse Proxy** - Automatic deployment and configuration
-- **Docker Container Stacks** - Full lifecycle management (create, start, stop, restart, delete)
-- **Dynamic Routing** - Automatic Traefik label generation for services
-- **SSL/TLS Certificates** - Automatic Let's Encrypt certificate provisioning and renewal
-- **External Routes** - Proxy routing to non-Docker targets (host ports, external URLs)
-- **Persistent Storage** - SQLite database for configuration persistence
-- **Built-in Monitoring** - Container state monitoring and maintenance
+**The Problem It Solves:**
+Setting up production Docker infrastructure typically requires manually configuring Traefik/Nginx, managing SSL certificates, writing docker-compose files, and maintaining routing rules. Each new service means updating multiple configuration files and restarting proxies.
+
+**The Stack App Solution:**
+Deploy Stack App once. It automatically provisions and manages:
+
+- **Traefik Reverse Proxy** - Auto-deployed, configured, and maintained
+- **SSL/TLS Certificates** - Let's Encrypt automation with multi-provider support
+- **Container Stacks** - Full lifecycle management via REST API
+- **Dynamic Routing** - Path-based and domain-based routing without config files
+- **External Integration** - Route to non-Docker services (internal APIs, external SaaS, S3 buckets)
+- **State Management** - Persistent SQLite database with automatic recovery
+
+**Real-World Example:**
+```
+example.com           → Your main website (Docker container)
+example.com/api       → Internal API server (https://api.internal:8080)
+example.com/auth      → External auth service (https://auth.saas.com)
+example.com/media     → S3 bucket (https://bucket.s3.amazonaws.com)
+```
+All configured through a single JSON API call. SSL certificates automatically provisioned. No config files to edit.
 
 ## Key Features
 
@@ -760,7 +776,19 @@ openssl rand -hex 32
 
 ## Documentation
 
-- **[REQUIREMENTS.md](REQUIREMENTS.md)** - Complete Software Requirements Specification
+### Requirements Specification
+
+Complete technical specifications organized for easy navigation:
+
+- **[Requirements Overview](requirements/index.md)** - Main Software Requirements Specification (SRS)
+- **[API Specification](requirements/api-specification.md)** - Complete REST API reference
+- **[Data Models](requirements/data-models.md)** - JSON schemas for all objects
+- **[Database Schema](requirements/database-schema.md)** - SQLite tables and relationships
+- **[Validation Rules](requirements/validation-rules.md)** - Input validation patterns
+- **[Examples](requirements/examples/full-stack.md)** - Real-world configuration examples
+
+### Development
+
 - **[CLAUDE.md](CLAUDE.md)** - Development guidelines for Claude Code
 
 ---
